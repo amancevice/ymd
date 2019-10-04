@@ -1,0 +1,13 @@
+version: '3.7'
+services:
+  dynamodb:
+    command: -jar DynamoDBLocal.jar -dbPath /var/tmp/ -optimizeDbBeforeStartup
+    env_file: .env
+    image: amazon/dynamodb-local
+    ports:
+    - 8000:8000
+    restart: always
+    volumes:
+    - dynamodb:/var/tmp/
+volumes:
+  dynamodb:
