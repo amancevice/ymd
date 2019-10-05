@@ -1,5 +1,8 @@
+require "securerandom"
+
 require "dotenv/load"
 require "aws-sdk-dynamodb"
+require "icalendar/google"
 require "rspec/core/rake_task"
 
 RSpec::Core::RakeTask.new(:spec)
@@ -15,6 +18,18 @@ DYNAMODB_TABLE_NAME = ENV["DYNAMODB_TABLE_NAME"] || "Ymd"
 DYNAMODB_CLIENT     = Aws::DynamoDB::Client.new endpoint: DYNAMODB_ENDPOINT
 DYNAMODB_TABLE      = Aws::DynamoDB::Table.new name:   DYNAMODB_TABLE_NAME,
                                                client: DYNAMODB_CLIENT
+
+SEEDS = [
+  "uqr1emskpd1iochp7r1v8v0nl8@group.calendar.google.com", # TWC
+  "ht3jlfaac5lfd6263ulfh4tql8@group.calendar.google.com", # Lunar
+  "en.usa#holiday@group.v.calendar.google.com",           # US Holidays
+]
+
+class String
+  def sha256sum
+    Digest::SHA256.hexdigest self
+  end
+end
 
 namespace :db do
   desc "Start DynamoDB container"
@@ -68,16 +83,28 @@ namespace :db do
 
   desc "Seed DynamoDB"
   task :seed => :create do
-    partitions = [
-      "ht3jlfaac5lfd6263ulfh4tql8@group.calendar.google.com",
-      "en.usa#holiday@group.v.calendar.google.com"
-    ]
-    items = partitions.map do |partition|
-      {Partition: partition, Sort: "CALENDAR~v0"}
-    end
-    items.map do |item|
-      puts "INSERT #{item.to_json}"
-      DYNAMODB_TABLE.put_item item: item
+    SEEDS.each do |seed|
+      Icalendar::Calendar.from_google_id(seed).each do |ical|
+        ical_id     = SecureRandom.alphanumeric
+        ical_digest = Digest::SHA256.hexdigest(ical.to_ical)
+
+        calendar = {
+          Partition: ical_id,
+          Sort:      "CALENDAR~v0",
+          Digest:    ical_digest,
+          Url:       ical.ical_url,
+        }
+        puts "INSERT #{calendar.slice(:Partition, :Sort).to_json}"
+        DYNAMODB_TABLE.put_item item: calendar
+
+        listing = {
+          Partition: ical_id,
+          Sort:      "LISTING~v0",
+          Digests:   ical.events.map(&:to_ical).map(&:sha256sum),
+        }
+        puts "INSERT #{listing.slice(:Partition, :Sort).to_json}"
+        DYNAMODB_TABLE.put_item item: listing
+      end
     end
   end
 
