@@ -1,3 +1,5 @@
+require "time"
+
 require "aws-sdk-dynamodb"
 
 module Ymd
@@ -10,6 +12,10 @@ module Ymd
         name   = options.delete(:name) || "Ymd"
         client = Aws::DynamoDB::Client.new(options)
         @table = Aws::DynamoDB::Table.new(name: name, client: client)
+      end
+
+      def calendars
+        CalendarCollection.new(self)
       end
 
       def create_table
@@ -72,5 +78,53 @@ module Ymd
         end
       end
     end
+
+    class CalendarCollection
+      include Enumerable
+
+      def initialize(client)
+        @client = client
+      end
+
+      def each
+        @client.table.scan.items.each{|x| yield x }
+      end
+
+      def add(calendars)
+        calendars.each do |key, cal|
+          item = {
+            Partition:  "$#{key}",
+            Sort:       "#{cal.ical_name}~v0",
+            Digest:     cal.to_ical.sha256sum,
+            CreatedUTC: Time.now.utc.iso8601,
+            "#{cal.ical_name}": {
+              CALSCALE: cal.calscale,
+              METHOD:   cal.ip_method,
+              PRODID:   cal.prodid,
+              VERSION:  cal.version,
+            },
+          }
+          puts "INSERT #{item.slice(:Partition, :Sort).to_json}"
+          @client.table.put_item(item: item)
+
+          cal.events.each do |event|
+            item = {
+              Partition:  "##{key}~#{event.uid}",
+              Sort:       "#{event.ical_name}~v0",
+              Digest:     event.to_ical.sha256sum,
+              CreatedUTC: Time.now.utc.iso8601,
+              "#{event.ical_name}": {},
+            }
+            puts "INSERT #{item.slice(:Partition, :Sort).to_json}"
+            @client.table.put_item(item: item)
+          end
+        end
+      end
+    end
   end
 end
+
+# @user
+# +subscription
+# $calendar
+# #event
