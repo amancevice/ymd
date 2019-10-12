@@ -1,4 +1,5 @@
 require "ymd/version"
+require "ymd/string"
 
 module Ymd
   class Error < StandardError; end
