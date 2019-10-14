@@ -7,9 +7,9 @@ module Ymd
     class Client
       attr_reader :table
 
-      def initialize(options = {})
+      def initialize(name:nil, **options)
         options.delete(:endpoint) if options[:endpoint].nil?
-        name   = options.delete(:name) || "Ymd"
+        name ||= "Ymd"
         client = Aws::DynamoDB::Client.new(options)
         @table = Aws::DynamoDB::Table.new(name: name, client: client)
       end
@@ -123,8 +123,3 @@ module Ymd
     end
   end
 end
-
-# @user
-# +subscription
-# $calendar
-# #event

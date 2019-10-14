@@ -107,16 +107,23 @@ end
 
 =begin
 
-| Partition             | Sort                  | Meaning                         |
-|:--------------------- |:--------------------- |:------------------------------- |
-| @user                 | USER~v0               | User                            |
-| @user                 | @other/#              | User follow                     |
-| @user                 | @other/#calendar      | User follow                     |
-| @user/*               | FEED~v0               | Feed calendar (read-only)       |
-| @user/*/event         | @user/#calendar/event | Feed calendar event (read-only) |
-| @user/#               | CAL~v0                | Main calendar                   |
-| @user/#calendar       | CAL~v0                | Secondary calendar              |
-| @user/#/event         | EVENT~v0              | Main calendar event             |
-| @user/#calendar/event | EVENT~v0              | Secondary calendar event        |
+| Partition             | Sort                       | Meaning                         |
+|:--------------------- |:-------------------------- |:------------------------------- |
+| @user                 | USER~v0                    | User                            |
+| @user                 | SUB~@other/#               | User follow                     |
+| @user                 | SUB~@other/#calendar       | User follow                     |
+| @user/*               | CALENDAR~v0                | Feed calendar (read-only)       |
+| @user/*               | FEED~@user/#calendar/event | Feed calendar event (read-only) |
+| @user/#               | CALENDAR~v0                | Main calendar                   |
+| @user/#calendar       | CALENDAR~v0                | Secondary calendar              |
+| @user/#/event         | EVENT~v0                   | Main calendar event             |
+| @user/#calendar/event | EVENT~v0                   | Secondary calendar event        |
+
+
+# Calendar updated process cascade
+@acme/#cal         | CALENDAR~v0
+└── @acme/#cal/eid | EVENT~v0
+    ├──@me/*       | FEED~@acme/#cal/eid
+    └──@you/*      | FEED~@acme/#cal/eid
 
 =end
