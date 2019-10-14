@@ -44,9 +44,55 @@ namespace :db do
 
   desc "Seed DynamoDB"
   task :seed => :create do
-    SEEDS.map do |user, seed|
-      Icalendar::Calendar.from_google_id(seed).map do |ical|
-        YMD_CLIENT.calendars.add(seed => ical)
+    SEEDS.map do |name, seed|
+      # seed user
+      user = {
+        Partition:  name,
+        Sort:       "USER~v0",
+        CreatedUTC: Time.now.utc.iso8601,
+      }
+      puts "INSERT #{user.slice(:Partition, :Sort).to_json}"
+      YMD_CLIENT.table.put_item(item: user)
+
+      # seed ical
+      Icalendar::Calendar.from_google_id(seed).map do |cal|
+        ical = {
+          Partition:  "#{name}/#",
+          Sort:       "ICAL~v0",
+          Digest:     cal.to_ical.sha256sum,
+          CreatedUTC: Time.now.utc.iso8601,
+          "#{cal.ical_name}": {
+            CALSCALE: cal.calscale,
+            METHOD:   cal.ip_method,
+            PRODID:   cal.prodid,
+            VERSION:  cal.version,
+          },
+        }
+        puts "INSERT #{ical.slice(:Partition, :Sort).to_json}"
+        YMD_CLIENT.table.put_item(item: ical)
+
+        ical.update(Partition:  "#{name}/*")
+        puts "INSERT #{ical.slice(:Partition, :Sort).to_json}"
+        YMD_CLIENT.table.put_item(item: ical)
+
+        # seed events
+        cal.events.map do |event|
+          hash = "#{name}/#/#{event.uid}"
+          feed = "#{name}/*/#{event.uid}"
+          item = {
+            Partition:  hash,
+            Sort:       "EVENT~v0",
+            Digest:     event.to_ical.sha256sum,
+            CreatedUTC: Time.now.utc.iso8601,
+            "#{event.ical_name}": {},
+          }
+          puts "INSERT #{item.slice(:Partition, :Sort).to_json}"
+          YMD_CLIENT.table.put_item(item: item)
+
+          item.update(Partition: feed, Sort: hash)
+          puts "INSERT #{item.slice(:Partition, :Sort).to_json}"
+          YMD_CLIENT.table.put_item(item: item)
+        end
       end
     end
   end
@@ -58,3 +104,19 @@ namespace :db do
     end
   end
 end
+
+=begin
+
+| Partition             | Sort                  | Meaning                         |
+|:--------------------- |:--------------------- |:------------------------------- |
+| @user                 | USER~v0               | User                            |
+| @user                 | @other/#              | User follow                     |
+| @user                 | @other/#calendar      | User follow                     |
+| @user/*               | FEED~v0               | Feed calendar (read-only)       |
+| @user/*/event         | @user/#calendar/event | Feed calendar event (read-only) |
+| @user/#               | CAL~v0                | Main calendar                   |
+| @user/#calendar       | CAL~v0                | Secondary calendar              |
+| @user/#/event         | EVENT~v0              | Main calendar event             |
+| @user/#calendar/event | EVENT~v0              | Secondary calendar event        |
+
+=end
