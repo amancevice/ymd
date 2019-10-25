@@ -1,15 +1,41 @@
+require "time"
+
 require "ymd/dynamodb"
 
 DYNAMODB_ENDPOINT   = ENV["DYNAMODB_ENDPOINT"]   || "http://localhost:8000"
 DYNAMODB_TABLE_NAME = ENV["DYNAMODB_TABLE_NAME"] || "Ymd"
 
-YMD_CLIENT = Ymd::DynamoDB::Client.new name: DYNAMODB_TABLE_NAME, endpoint: DYNAMODB_ENDPOINT
+YMD_CLIENT = Ymd::DynamoDB::Client.new(name: DYNAMODB_TABLE_NAME, endpoint: DYNAMODB_ENDPOINT)
 
 SEEDS = {
-  "@bostontwc" => "uqr1emskpd1iochp7r1v8v0nl8@group.calendar.google.com", # TWC
-  "@themoon"   => "ht3jlfaac5lfd6263ulfh4tql8@group.calendar.google.com", # Lunar
-  "@usolidays" => "en.usa#holiday@group.v.calendar.google.com",           # US Holidays
+  "@BostonTWC"  => "uqr1emskpd1iochp7r1v8v0nl8@group.calendar.google.com", # TWC
+  "@themoon"    => "ht3jlfaac5lfd6263ulfh4tql8@group.calendar.google.com", # Lunar
+  "@usholidays" => "en.usa#holiday@group.v.calendar.google.com",           # US Holidays
 }
+
+=begin
+
+| Partition             | Sort                       | Meaning                  |
+|:--------------------- |:-------------------------- |:------------------------ |
+| @user                 | USER~v0                    | User                     |
+| @user                 | SUB~@other/#               | User follow              |
+| @user                 | SUB~@other/#calendar       | User follow              |
+| @user/*               | CALENDAR~v0                | Feed calendar            |
+| @user/*               | @user/#calendar/event      | Feed calendar event      |
+| @user/#               | CALENDAR~v0                | Main calendar            |
+| @user/#calendar       | CALENDAR~v0                | Secondary calendar       |
+| @user/#/event         | EVENT~v0                   | Main calendar event      |
+| @user/#calendar/event | EVENT~v0                   | Secondary calendar event |
+
+
+# Calendar updated process cascade
+@acme/#cal         | CALENDAR~v0
+├── @acme/*        | CALENDAR~v0
+└── @acme/#cal/eid | EVENT~v0
+    ├── @me/*      | FEED~@acme/#cal/eid
+    └── @you/*     | FEED~@acme/#cal/eid
+
+=end
 
 namespace :db do
   desc "Start DynamoDB container"
@@ -135,26 +161,3 @@ namespace :db do
     end
   end
 end
-
-=begin
-
-| Partition             | Sort                       | Meaning                  |
-|:--------------------- |:-------------------------- |:------------------------ |
-| @user                 | USER~v0                    | User                     |
-| @user                 | SUB~@other/#               | User follow              |
-| @user                 | SUB~@other/#calendar       | User follow              |
-| @user/*               | CALENDAR~v0                | Feed calendar            |
-| @user/*               | FEED~@user/#calendar/event | Feed calendar event      |
-| @user/#               | CALENDAR~v0                | Main calendar            |
-| @user/#calendar       | CALENDAR~v0                | Secondary calendar       |
-| @user/#/event         | EVENT~v0                   | Main calendar event      |
-| @user/#calendar/event | EVENT~v0                   | Secondary calendar event |
-
-
-# Calendar updated process cascade
-@acme/#cal         | CALENDAR~v0
-└── @acme/#cal/eid | EVENT~v0
-    ├──@me/*       | FEED~@acme/#cal/eid
-    └──@you/*      | FEED~@acme/#cal/eid
-
-=end
