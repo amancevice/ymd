@@ -71,6 +71,16 @@ module Ymd
       rescue Aws::DynamoDB::Errors::ResourceInUseException
       end
 
+      def put_item(options = {})
+        puts "PUT #{options.to_json}"
+        @table.put_item(options)
+      end
+
+      def query(options = {})
+        puts "QUERY #{options.to_json}"
+        @table.query(options)
+      end
+
       class << self
         def localhost(options = {})
           options[:endpoint] = "http://localhost:8000"

@@ -67,8 +67,7 @@ namespace :db do
         Sort:       "USER~v0",
         CreatedUTC: Time.now.utc.iso8601,
       }
-      puts "INSERT #{user.slice(:Partition, :Sort).to_json}"
-      YMD_CLIENT.table.put_item(item: user)
+      YMD_CLIENT.put_item(item: user)
 
       # seed ical
       Icalendar::Calendar.from_google_id(seed).map do |cal|
@@ -85,12 +84,10 @@ namespace :db do
             VERSION:  cal.version,
           },
         }
-        puts "INSERT #{ical.slice(:Partition, :Sort).to_json}"
-        YMD_CLIENT.table.put_item(item: ical)
+        YMD_CLIENT.put_item(item: ical)
 
         ical.update(Partition:  "#{name}/*")
-        puts "INSERT #{ical.slice(:Partition, :Sort).to_json}"
-        YMD_CLIENT.table.put_item(item: ical)
+        YMD_CLIENT.put_item(item: ical)
 
         # seed events
         cal.events.map do |event|
@@ -103,12 +100,10 @@ namespace :db do
             CreatedUTC: Time.now.utc.iso8601,
             "#{event.ical_name}": {},
           }
-          puts "INSERT #{item.slice(:Partition, :Sort).to_json}"
-          YMD_CLIENT.table.put_item(item: item)
+          YMD_CLIENT.put_item(item: item)
 
           item.update(Partition: feed, Sort: hash)
-          puts "INSERT #{item.slice(:Partition, :Sort).to_json}"
-          YMD_CLIENT.table.put_item(item: item)
+          YMD_CLIENT.put_item(item: item)
         end
       end
     end
@@ -134,10 +129,10 @@ namespace :db do
       }
       if sort
         opts[:key_condition_expression] << " AND begins_with(#S, :Sort)"
-        opts[:expression_attribute_names].update("#S" => ":Sort")
+        opts[:expression_attribute_names].update("#S" => "Sort")
         opts[:expression_attribute_values].update(":Sort" => sort)
       end
-      res = YMD_CLIENT.table.query(opts)
+      res = YMD_CLIENT.query(opts)
       puts JSON.pretty_generate(items: res.items)
     end
 
@@ -153,10 +148,10 @@ namespace :db do
       }
       if hash
         opts[:key_condition_expression] << " AND begins_with(#P, :Partition)"
-        opts[:expression_attribute_names].update("#P" => ":Partition")
+        opts[:expression_attribute_names].update("#P" => "Partition")
         opts[:expression_attribute_values].update(":Partition" => hash)
       end
-      res = YMD_CLIENT.table.query(opts)
+      res = YMD_CLIENT.query(opts)
       puts JSON.pretty_generate(items: res.items)
     end
   end
