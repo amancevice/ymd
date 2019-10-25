@@ -5,7 +5,7 @@ require "ymd/dynamodb"
 DYNAMODB_ENDPOINT   = ENV["DYNAMODB_ENDPOINT"]   || "http://localhost:8000"
 DYNAMODB_TABLE_NAME = ENV["DYNAMODB_TABLE_NAME"] || "Ymd"
 
-YMD_CLIENT = Ymd::DynamoDB::Client.new(name: DYNAMODB_TABLE_NAME, endpoint: DYNAMODB_ENDPOINT)
+YMD = Ymd::DynamoDB::Client.new(name: DYNAMODB_TABLE_NAME, endpoint: DYNAMODB_ENDPOINT)
 
 SEEDS = {
   "@BostonTWC"  => "uqr1emskpd1iochp7r1v8v0nl8@group.calendar.google.com", # TWC
@@ -55,7 +55,7 @@ namespace :db do
 
   desc "Create DynamoDB table"
   task :create => :start do
-    YMD_CLIENT.create_table
+    YMD.create_table
   end
 
   desc "Seed DynamoDB"
@@ -67,7 +67,7 @@ namespace :db do
         Sort:       "USER~v0",
         CreatedUTC: Time.now.utc.iso8601,
       }
-      YMD_CLIENT.put_item(item: user)
+      YMD.put_item(item: user)
 
       # seed ical
       Icalendar::Calendar.from_google_id(seed).map do |cal|
@@ -84,15 +84,15 @@ namespace :db do
             VERSION:  cal.version,
           },
         }
-        YMD_CLIENT.put_item(item: ical)
+        YMD.put_item(item: ical)
 
         ical.update(Partition:  "#{name}/*")
-        YMD_CLIENT.put_item(item: ical)
+        YMD.put_item(item: ical)
 
         # seed events
         cal.events.map do |event|
           hash = "#{name}/#/#{event.uid}"
-          feed = "#{name}/*/#{event.uid}"
+          feed = "#{name}/*"
           item = {
             Partition:  hash,
             Sort:       "EVENT~v0",
@@ -100,10 +100,10 @@ namespace :db do
             CreatedUTC: Time.now.utc.iso8601,
             "#{event.ical_name}": {},
           }
-          YMD_CLIENT.put_item(item: item)
+          YMD.put_item(item: item)
 
           item.update(Partition: feed, Sort: hash)
-          YMD_CLIENT.put_item(item: item)
+          YMD.put_item(item: item)
         end
       end
     end
@@ -112,7 +112,7 @@ namespace :db do
   desc "Scan items in DB"
   task :scan, [:limit] do |t,args|
     limit = args[:limit] || "10"
-    YMD_CLIENT.table.scan(limit: limit).items.map do |item|
+    YMD.table.scan(limit: limit).items.map do |item|
       puts JSON.pretty_generate item
     end
   end
@@ -132,7 +132,7 @@ namespace :db do
         opts[:expression_attribute_names].update("#S" => "Sort")
         opts[:expression_attribute_values].update(":Sort" => sort)
       end
-      res = YMD_CLIENT.query(opts)
+      res = YMD.query(opts)
       puts JSON.pretty_generate(items: res.items)
     end
 
@@ -151,7 +151,7 @@ namespace :db do
         opts[:expression_attribute_names].update("#P" => "Partition")
         opts[:expression_attribute_values].update(":Partition" => hash)
       end
-      res = YMD_CLIENT.query(opts)
+      res = YMD.query(opts)
       puts JSON.pretty_generate(items: res.items)
     end
   end
