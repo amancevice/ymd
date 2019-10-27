@@ -29,6 +29,10 @@ module Ymd
               attribute_name: "Sort",
               attribute_type: "S",
             },
+            {
+              attribute_name: "Time",
+              attribute_type: "S",
+            },
           ],
           key_schema: [
             {
@@ -62,6 +66,24 @@ module Ymd
               },
             },
           ],
+          local_secondary_indexes: [
+            {
+              index_name: "PartitionTime",
+              key_schema: [
+                {
+                  attribute_name: "Partition",
+                  key_type: "HASH",
+                },
+                {
+                  attribute_name: "Time",
+                  key_type: "RANGE",
+                },
+              ],
+              projection: {
+                projection_type: "ALL",
+              },
+            },
+          ],
           provisioned_throughput: {
             read_capacity_units: 5,
             write_capacity_units: 5,
@@ -79,6 +101,11 @@ module Ymd
       def query(options = {})
         puts "QUERY #{options.to_json}"
         @table.query(options)
+      end
+
+      def scan(options = {})
+        puts "SCAN #{options.to_json}"
+        @table.scan(options)
       end
 
       class << self
