@@ -9,5 +9,12 @@ services:
     restart: always
     volumes:
     - dynamodb:/var/tmp/
+  dynamodb-localstack:
+    image: localstack/localstack
+    environment:
+      SERVICES: dynamodb
+    ports:
+    - 4569:4569
+    - 4570:4570
 volumes:
   dynamodb:

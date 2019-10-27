@@ -1,3 +1,7 @@
+require "time"
+
+require "icalendar/google"
+
 =begin
 
 | Partition     | Sort          | Meaning                  |
@@ -28,7 +32,6 @@
 =end
 
 SEEDS = {
-  "@ymd"        => nil,
   "@BostonTWC"  => "uqr1emskpd1iochp7r1v8v0nl8@group.calendar.google.com", # TWC
   "@themoon"    => "ht3jlfaac5lfd6263ulfh4tql8@group.calendar.google.com", # Lunar
   "@usholidays" => "en.usa#holiday@group.v.calendar.google.com",           # US Holidays
@@ -72,8 +75,8 @@ namespace :db do
       end
     end
 
-    task :calendars do
-      SEEDS.select{|name, seed| v }.map do |name, seed|
+    task :calendars => :users do
+      SEEDS.map do |name, seed|
         Icalendar::Calendar.from_google_id(seed).map do |cal|
           ical = {
             Partition:  "#{name}/#",
@@ -93,8 +96,8 @@ namespace :db do
       end
     end
 
-    task :events do
-      SEEDS.select{|name, seed| v }.map do |name, seed|
+    task :events => :calendars do
+      SEEDS.map do |name, seed|
         Icalendar::Calendar.from_google_id(seed).map do |cal|
           cal.events.map do |event|
             hash = "#{name}/#/#{event.uid}"
@@ -119,5 +122,5 @@ namespace :db do
   end
 
   desc "Seed DynamoDB"
-  task :seed => [:"seed:users", :"seed:calendars", :"seed:events"]
+  task :seed => :"seed:events"
 end
