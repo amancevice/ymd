@@ -94,17 +94,17 @@ module Ymd
       end
 
       def put_item(options = {})
-        puts "PUT #{options.to_json}"
+        STDERR.write("PUT #{JSON.pretty_generate(options)}\n")
         @table.put_item(options)
       end
 
       def query(options = {})
-        puts "QUERY #{options.to_json}"
+        STDERR.write("QUERY #{JSON.pretty_generate(options)}\n")
         @table.query(options)
       end
 
       def scan(options = {})
-        puts "SCAN #{options.to_json}"
+        STDERR.write("SCAN #{JSON.pretty_generate(options)}\n")
         @table.scan(options)
       end
 
