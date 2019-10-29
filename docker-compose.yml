@@ -9,12 +9,16 @@ services:
     restart: always
     volumes:
     - dynamodb:/var/tmp/
-  dynamodb-localstack:
+  localstack:
     image: localstack/localstack
     environment:
-      SERVICES: dynamodb
+      SERVICES: dynamodb,apigateway,lambda,s3
+      PORT_WEB_UI: "9000"
     ports:
-    - 4569:4569
-    - 4570:4570
+    - "4567-4584:4567-4584"
+    - "9000:9000"
+    volumes:
+    - localstack:/tmp/localstack
 volumes:
   dynamodb:
+  localstack:
