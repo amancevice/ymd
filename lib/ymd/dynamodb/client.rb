@@ -1,17 +1,31 @@
 require "time"
 
 require "aws-sdk-dynamodb"
+require "aws-sdk-dynamodbstreams"
 
 module Ymd
   module DynamoDB
     class Client
-      attr_reader :table
+      attr_reader :table, :streams
 
       def initialize(name:nil, **options)
         options.delete(:endpoint) if options[:endpoint].nil?
-        name ||= "Ymd"
-        client = Aws::DynamoDB::Client.new(options)
-        @table = Aws::DynamoDB::Table.new(name: name, client: client)
+        name   ||= "Ymd"
+        client   = Aws::DynamoDB::Client.new(options)
+        @streams = Aws::DynamoDBStreams::Client.new(options)
+        @table   = Aws::DynamoDB::Table.new(name: name, client: client)
+      end
+
+      def shards(options = {})
+        options[:stream_arn] ||= @table.latest_stream_arn
+        @streams.describe_stream(options)&.stream_description&.shards
+      end
+
+      def shard_iterator(options = {})
+        options[:stream_arn]          ||= @table.latest_stream_arn
+        options[:shard_id]            ||= shards(options.slice(:stream_arn)).first.shard_id
+        options[:shard_iterator_type] ||= :LATEST
+        @streams.get_shard_iterator(options)&.shard_iterator
       end
 
       def create_table
