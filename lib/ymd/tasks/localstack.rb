@@ -1,35 +1,31 @@
-require "time"
+require "rake"
 
-require "aws-sdk-dynamodb"
-require "aws-sdk-dynamodbstreams"
+require "ymd/client"
 
-module Ymd
-  module DynamoDB
-    class Client
-      attr_reader :table, :streams
+namespace :localstack do
+  desc "Start localstack"
+  task :start do
+    sh "docker-compose up --detach localstack"
+  end
 
-      def initialize(name:nil, **options)
-        options.delete(:endpoint) if options[:endpoint].nil?
-        name   ||= "Ymd"
-        client   = Aws::DynamoDB::Client.new(options)
-        @streams = Aws::DynamoDBStreams::Client.new(options)
-        @table   = Aws::DynamoDB::Table.new(name: name, client: client)
-      end
+  desc "Stop localstack"
+  task :stop do
+    sh "docker-compose down"
+  end
 
-      def shards(options = {})
-        options[:stream_arn] ||= @table.latest_stream_arn
-        @streams.describe_stream(options)&.stream_description&.shards
-      end
+  desc "Drop localstack"
+  task :drop do
+    sh "docker-compose down --volumes"
+  end
 
-      def shard_iterator(options = {})
-        options[:stream_arn]          ||= @table.latest_stream_arn
-        options[:shard_id]            ||= shards(options.slice(:stream_arn)).first.shard_id
-        options[:shard_iterator_type] ||= :LATEST
-        @streams.get_shard_iterator(options)&.shard_iterator
-      end
+  namespace :bootstrap do
+    task :connect => [:start] do
+      @ymd = Ymd::Client.env
+    end
 
-      def create_table
-        @table.client.create_table({
+    namespace :dynamodb do
+      task :create_table => [:connect] do
+        @ymd.table.client.create_table({
           attribute_definitions: [
             {
               attribute_name: "Partition",
@@ -102,32 +98,33 @@ module Ymd
             stream_enabled: true,
             stream_view_type: "NEW_AND_OLD_IMAGES",
           },
-          table_name: @table.name,
+          table_name: @ymd.table.name,
         })
-      rescue Aws::DynamoDB::Errors::ResourceInUseException
+      end
+    end
+
+    namespace :sqs do
+      task :create_queue => [:connect] do
+        @ymd.queue.client.create_queue(queue_name: @ymd.queue.url.split(/\//).last)
+      end
+    end
+
+    namespace :sns do
+      task :create_topic => [:connect] do
+        @ymd.topic.client.create_topic(name: @ymd.topic.arn.split(/:/).last)
       end
 
-      def put_item(options = {})
-        STDERR.write("PUT #{JSON.pretty_generate(options)}\n")
-        @table.put_item(options)
-      end
-
-      def query(options = {})
-        STDERR.write("QUERY #{JSON.pretty_generate(options)}\n")
-        @table.query(options)
-      end
-
-      def scan(options = {})
-        STDERR.write("SCAN #{JSON.pretty_generate(options)}\n")
-        @table.scan(options)
-      end
-
-      class << self
-        def localhost(options = {})
-          options[:endpoint] = "http://localhost:8000"
-          new(options)
-        end
+      task :subscribe_queue => [:connect] do
+        @ymd.topic.subscribe(protocol: "sqs", endpoint: @ymd.queue.url)
       end
     end
   end
+
+  desc "Bootstrap localstack"
+  task :bootstrap => [
+    :"bootstrap:dynamodb:create_table",
+    :"bootstrap:sqs:create_queue",
+    :"bootstrap:sns:create_topic",
+    :"bootstrap:sns:subscribe_queue",
+  ]
 end

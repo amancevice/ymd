@@ -5,6 +5,8 @@ $LOAD_PATH.unshift(lib) unless $LOAD_PATH.include?(lib)
 
 gem "aws-sdk-dynamodb",        "~> 1.35"
 gem "aws-sdk-dynamodbstreams", "~> 1.15"
+gem "aws-sdk-sns",             "~> 1.19"
+gem "aws-sdk-sqs",             "~> 1.22"
 gem "icalendar-google",        "~> 0.4"
 
 group :development do
